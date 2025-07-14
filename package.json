@@ -1,0 +1,28 @@
+{
+  "name": "kosak",
+  "version": "1.0.0",
+  "description": "haha bollz",
+  "homepage": "https://github.com/HelloWorld7894/KOSak#readme",
+  "bugs": {
+    "url": "https://github.com/HelloWorld7894/KOSak/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HelloWorld7894/KOSak.git"
+  },
+  "license": "MIT",
+  "author": "HelloWorld7894",
+  "type": "commonjs",
+  "main": "main.js",
+  "scripts": {
+    "watch": "npx @tailwindcss/cli -i ./src/style/input.css -o ./src/style/output.css --watch",
+    "dev": "live-server ./src"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "tailwindcss": "^4.1.11"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
