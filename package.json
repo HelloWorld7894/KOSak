@@ -28,6 +28,7 @@
     "@tailwindcss/vite": "^4.1.11",
     "alpinejs": "^3.14.9",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.3.93",
     "tailwindcss": "^4.1.11"
   }
 }
