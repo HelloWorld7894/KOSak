@@ -1,7 +1,7 @@
 {
   "name": "kosak",
-  "version": "1.0.0",
-  "description": "haha bollz",
+  "version": "0.0.0",
+  "description": "idk",
   "homepage": "https://github.com/HelloWorld7894/KOSak#readme",
   "bugs": {
     "url": "https://github.com/HelloWorld7894/KOSak/issues"
@@ -12,17 +12,22 @@
   },
   "license": "MIT",
   "author": "HelloWorld7894",
-  "type": "commonjs",
-  "main": "main.js",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "watch": "npx @tailwindcss/cli -i ./src/style/input.css -o ./src/style/output.css --watch",
-    "dev": "live-server ./src"
-  },
-  "dependencies": {
-    "@tailwindcss/cli": "^4.1.11",
-    "tailwindcss": "^4.1.11"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
-    "live-server": "^1.2.2"
+    "@types/alpinejs": "^3.13.11",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "alpinejs": "^3.14.9",
+    "pdf-lib": "^1.17.1",
+    "tailwindcss": "^4.1.11"
   }
 }
