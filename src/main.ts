@@ -19,6 +19,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
 // some things outside of AlpineJS
 var pdf_document: PDFDocument; // global variable for loaded PDFs
 
+// uploading document
 document.getElementById("schedule-upload")?.addEventListener("click", async (event: PointerEvent) => {
     let file_list: FileList = (<HTMLInputElement>document.getElementById("schedule-input")).files!;
 
@@ -49,4 +50,27 @@ document.getElementById("schedule-upload")?.addEventListener("click", async (eve
             document.getElementById("canvas-mask")!.setAttribute("hidden", "")
         })
     })
+})
+
+// modifying document
+document.getElementById("add-schedule")?.addEventListener("click", (event: PointerEvent) => {
+    let day = document.querySelector("button[selected]")!.id
+    let place: string = (document.getElementById("place") as HTMLInputElement)!.value
+    let name: string = (document.getElementById("name") as HTMLInputElement)!.value
+    let time_start: string = (document.getElementById("start-time") as HTMLInputElement)!.value
+    let time_end: string = (document.getElementById("end-time") as HTMLInputElement)!.value
+
+    console.log(day, place, name, time_start, time_end)
+})
+
+// saving modified document
+document.getElementById("save-modified-schedule")?.addEventListener("click", async (event: PointerEvent) => {
+    const pdf_bytes = await pdf_document.save();
+    const blob = new Blob([pdf_bytes as BlobPart], { type: 'application/pdf' });
+
+    let url = URL.createObjectURL(blob)
+    
+    let link_button: HTMLAnchorElement = document.getElementById("schedule-download")! as HTMLAnchorElement;
+    link_button.download = "rozvrh_updated.pdf";
+    link_button.href = url
 })
