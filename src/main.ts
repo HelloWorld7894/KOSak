@@ -27,7 +27,9 @@ var pdf_font_regular: PDFFont;
 var pdf_font_bold: PDFFont;
 
 var pdf_scale: number = 7;
-var schedule_vert_sep: number[] = []
+var schedule_vert_sep: number[] = [];
+var schedule_hor_sep: number[] = [];
+var one_hour_space: number = 0;
 
 // uploading document
 document.getElementById("schedule-upload")?.addEventListener("click", async (event: PointerEvent) => {
@@ -39,22 +41,21 @@ document.getElementById("schedule-upload")?.addEventListener("click", async (eve
     pdf_document = await PDFDocument.load(array_buffer)
 
     // setting right font + fontkit
-    pdf_document.registerFontkit(fontkit);
-    let roboto_regular_buffer = await fetch(RobotoRegular).then((res) => res.arrayBuffer());
-    pdf_font_regular = await pdf_document.embedFont(roboto_regular_buffer);
+    await set_fonts()
 
-    let roboto_bold_buffer = await fetch(RobotoBold).then((res) => res.arrayBuffer());
-    pdf_font_bold = await pdf_document.embedFont(roboto_bold_buffer);
-    
     // pdf document rendering
-    await render_schedule()
+    let pdf_bytes = await pdf_document.save()
+    await render_schedule(pdf_bytes)
 
     // hide canvas mask
     document.getElementById("canvas-mask")!.setAttribute("hidden", "")
 
     // getting schedule vertical separation
-    await get_vertical_separation()
+    schedule_vert_sep = get_separation("vertical", 10).map(elem => elem[1])
+    schedule_vert_sep.splice(0, 1) // TODO: Uaaa i hate it but it works (seems like it detects some debris on canvas or smthing)
 
+    schedule_hor_sep = get_separation("horizontal", 5).map(elem => elem[0])
+    one_hour_space = schedule_hor_sep[1] - schedule_hor_sep[0]
 })
 
 // modifying document
@@ -72,8 +73,9 @@ document.getElementById("add-schedule")?.addEventListener("click", async (event:
         name,
         place
     );
-    
-    await render_schedule();
+
+    let pdf_bytes = await reload_document()
+    await render_schedule(pdf_bytes)
 })
 
 // saving modified document
@@ -88,9 +90,30 @@ document.getElementById("save-modified-schedule")?.addEventListener("click", asy
     link_button.href = url
 })
 
-async function render_schedule(){
-    let pdf: pdfjsLib.PDFDocumentProxy = await convert_pdf_lib_to_pdfjs(pdf_document)
 
+async function reload_document(){
+    // TODO: for some reason I have to reload the document after every change (sucks)
+
+    let pdf_bytes = await pdf_document.save()
+    pdf_document = await PDFDocument.load(pdf_bytes)
+    set_fonts()
+
+    return pdf_bytes
+}
+
+async function set_fonts(){
+    pdf_document.registerFontkit(fontkit);
+    let roboto_regular_buffer = await fetch(RobotoRegular).then((res) => res.arrayBuffer());
+    pdf_font_regular = await pdf_document.embedFont(roboto_regular_buffer);
+
+    let roboto_bold_buffer = await fetch(RobotoBold).then((res) => res.arrayBuffer());
+    pdf_font_bold = await pdf_document.embedFont(roboto_bold_buffer);
+}
+
+
+async function render_schedule(pdf_bytes: Uint8Array<ArrayBufferLike>){
+    let pdf = await pdfjsLib.getDocument({ data: pdf_bytes }).promise
+    
     return pdf.getPage(1).then((page: pdfjsLib.PDFPageProxy) => {
         let viewport = page.getViewport({scale: pdf_scale})
 
@@ -108,10 +131,17 @@ async function render_schedule(){
     })
 }
 
-async function convert_pdf_lib_to_pdfjs(pdf_doc: PDFDocument): Promise<pdfjsLib.PDFDocumentProxy>{
-    let pdf_bytes = await pdf_doc.save()
-    let loading_task = pdfjsLib.getDocument({ data: pdf_bytes })
-    return await loading_task.promise;
+function parse_time_to_date(time_str: string){
+    const [hours, minutes] = time_str.split(":").map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0); // hours, minutes, seconds, ms
+    return date;
+}
+
+function time_difference(time1: string, time2: string){
+    let millisecond_diff = new Date(parse_time_to_date(time1)).valueOf() - new Date(parse_time_to_date(time2)).valueOf()
+    let hour_diff = millisecond_diff / (1000 * 60 * 60)
+    return hour_diff
 }
 
 async function add_schedule_block(
@@ -126,7 +156,6 @@ async function add_schedule_block(
     let fontSize = 7;
     //let { width, height } = pdf_page.getSize();
 
-    let width: number = 52;
     let height: number = 49;
     let schedule_top_padding: number = 3
 
@@ -134,8 +163,9 @@ async function add_schedule_block(
     let orange = rgb(1, 0.8, 0.5); // light orange
     let brightOrange = rgb(1, 0.6, 0); // for the left box
 
-    let schedule_coords: number[] = [78, 478];
+    let schedule_coords: number[] = [78, 478]; // already set up to top-left portion of schedule
 
+    // positioning vertically
     switch(parseInt(day)){
         case 1:
             schedule_coords[1] = schedule_vert_sep[0]
@@ -154,6 +184,13 @@ async function add_schedule_block(
             break;
     }
     schedule_coords[1] -= (height + schedule_top_padding); // align for schedule height
+
+    // positioning horizontally
+    let hours_schedule_time = time_difference(time_end, time_start)
+    let schedule_starting_time = time_difference(time_start, "07:00") // starting time of all CTU lectures
+
+    let width: number = hours_schedule_time * one_hour_space; // getting schedule width
+    schedule_coords[0] = schedule_coords[0] + (schedule_starting_time * one_hour_space)
 
     let schedule_text_v_space: number = 3;
     let schedule_text_h_space: number = 5;
@@ -193,15 +230,6 @@ async function add_schedule_block(
         color: black,
     });
 
-    // Instructor
-    pdf_page.drawText('Vyučující', {
-        x: schedule_coords[0] + schedule_text_h_space,
-        y: schedule_coords[1] + height - 3 * (fontSize + schedule_text_v_space),
-        size: fontSize,
-        font: pdf_font_regular,
-        color: black,
-    });
-
     pdf_page.drawText(place, {
         x: schedule_coords[0] + schedule_text_h_space,
         y: schedule_coords[1] + height - 4 * (fontSize + schedule_text_v_space),
@@ -211,39 +239,65 @@ async function add_schedule_block(
     });
 }
 
-async function get_vertical_separation(){
-    let vertical_sep = []
+function canvas_to_pdf_coords(x: number, y: number, canvas_height: number){
+    let pdf_x = Math.round(x / pdf_scale);
+    let pdf_y = Math.round((canvas_height - y) / pdf_scale);
+    return [pdf_x, pdf_y]
+}
+
+function get_separation(type: string, tolerance: number){
+    let sep = []
+    let pdf_sep = []
+
     let threshold_color = 155
-    let walkon_col = 370
-    let on_vert_line: boolean = false
+    let walkon_coords = [370, 470] // [vertical, horizontal]
+    let on_line: boolean = false
 
     let canvas = <HTMLCanvasElement>document.getElementById("schedule-canvas")!
     let context: CanvasRenderingContext2D = canvas.getContext("2d")!;
 
     let data = context.getImageData(0, 0, canvas.width, canvas.height).data;
 
-    for (let y = 0; y < canvas.height; y++){
-        let idx = (y * canvas.width + walkon_col) * 4;
-        
-        let r = data[idx], g = data[idx + 1], b = data[idx + 2];
+    let walkon_func: (iter: number, arg1: number, arg2: number) => number = () => {return 0};
+    let iter_max: number = 0; // maximum iteration number
+    let walkon_axis: number = 0; // on what axis to do the "walking"
+    let out_format: number = -1; // where to place the "walking axis" (either x or y)
+    if (type == "vertical"){
+        iter_max = canvas.height;
+        walkon_axis = walkon_coords[0];
+        out_format = 1; 
+        walkon_func = (iter_y: number, width: number, col: number) => {return (iter_y * width + col) * 4}; // vertical calculation
+    }
+    else if (type == "horizontal"){
+        iter_max = canvas.width;
+        walkon_axis = walkon_coords[1];
+        out_format = 0;
+        walkon_func = (iter_x: number, width: number, row: number) => {return (row * width + iter_x) * 4}; // horizontal calculation
+    }
 
-        if (r == threshold_color && g == threshold_color && b == threshold_color) on_vert_line = true
+    for (let i = 0; i < iter_max; i++){
+        let idx: number = walkon_func(i, canvas.width, walkon_axis)
+        
+        const or_op = (color: number) => {return (threshold_color - tolerance >= color) || (threshold_color + tolerance <= color)}
+
+        let r = data[idx], g = data[idx + 1], b = data[idx + 2];
+        if (or_op(r) && or_op(g) && or_op(b)) on_line = true
         else {
-            if (on_vert_line) vertical_sep.push([walkon_col, y])
-            on_vert_line = false
+            if (on_line){
+                let out: number[] = [-1, -1]
+                out[out_format] = i
+                out[Math.abs(out_format - 1)] = walkon_axis
+
+                sep.push(out)
+            }
+            on_line = false
         }
 
     }
-    for (let i = 0; i < vertical_sep.length; i++){
-        let sep_point: number[] = canvas_to_pdf_coords(vertical_sep[i][0], vertical_sep[i][1], canvas.height)
-        schedule_vert_sep.push(sep_point[1])
+    for (let i = 0; i < sep.length; i++){
+        let sep_pdf_point: number[] = canvas_to_pdf_coords(sep[i][0], sep[i][1], canvas.height)
+        pdf_sep.push(sep_pdf_point)
     }
 
-    console.log(schedule_vert_sep)
-}
-
-function canvas_to_pdf_coords(x: number, y: number, canvas_height: number){
-    let pdf_x = Math.round(x / pdf_scale);
-    let pdf_y = Math.round((canvas_height - y) / pdf_scale);
-    return [pdf_x, pdf_y]
+    return pdf_sep
 }
